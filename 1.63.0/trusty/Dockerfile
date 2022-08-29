@@ -6,6 +6,8 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     RUST_VERSION=1.63.0
 
 RUN set -eux; \
+    apt-get -y purge liblzma-dev; \
+    apt-get -y autoremove; \
     dpkgArch="$(dpkg --print-architecture)"; \
     case "${dpkgArch##*-}" in \
         amd64) rustArch='x86_64-unknown-linux-gnu'; rustupSha256='5cc9ffd1026e82e7fb2eec2121ad71f4b0f044e88bca39207b3f6b769aaa799c' ;; \
@@ -20,6 +22,7 @@ RUN set -eux; \
     chmod +x rustup-init; \
     ./rustup-init -y --no-modify-path --profile minimal --default-toolchain $RUST_VERSION --default-host ${rustArch}; \
     rm rustup-init; \
+    cargo install cargo-deb; \
     chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
     rustup --version; \
     cargo --version; \
