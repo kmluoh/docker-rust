@@ -27,6 +27,7 @@ RUN set -eux; \
     chmod +x rustup-init; \
     ./rustup-init -y --no-modify-path --profile minimal --default-toolchain $RUST_VERSION --default-host ${rustArch}; \
     rm rustup-init; \
+    cargo install cargo-deb; \
     chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
     rustup --version; \
     cargo --version; \
