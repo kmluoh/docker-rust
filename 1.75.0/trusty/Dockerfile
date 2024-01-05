@@ -1,4 +1,4 @@
-FROM buildpack-deps:buster
+FROM buildpack-deps:trusty
 
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
@@ -6,6 +6,8 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     RUST_VERSION=1.75.0
 
 RUN set -eux; \
+    apt-get -y purge liblzma-dev; \
+    apt-get -y autoremove; \
     dpkgArch="$(dpkg --print-architecture)"; \
     case "${dpkgArch##*-}" in \
         amd64) rustArch='x86_64-unknown-linux-gnu'; rustupSha256='0b2f6c8f85a3d02fde2efc0ced4657869d73fccfce59defb4e8d29233116e6db' ;; \
