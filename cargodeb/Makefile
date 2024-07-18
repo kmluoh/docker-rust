@@ -14,6 +14,7 @@ build: src
 		pushd $$context; \
 		IFS=',' read -ra TAGS <<< "$$tags"; \
 		for tag in "$${TAGS[@]}"; do \
+		  echo "docker build --platform $$platforms -t $$tag ."; \
 		  docker build --platform $$platforms -t $$tag .; \
 		done; \
 		popd; \

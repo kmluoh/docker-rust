@@ -1,10 +1,25 @@
---- a
-+++ b
-@@ -22,6 +22,7 @@ RUN set -eux; \
+--- ../Dockerfile-slim.template
++++ Dockerfile-slim.template
+@@ -1,11 +1,12 @@
+ FROM debian:%%DEBIAN-SUITE%%-slim
+ 
+-LABEL org.opencontainers.image.source=https://github.com/rust-lang/docker-rust
++LABEL org.opencontainers.image.source=https://github.com/kmluoh/docker-rust
+ 
+ ENV RUSTUP_HOME=/usr/local/rustup \
+     CARGO_HOME=/usr/local/cargo \
+     PATH=/usr/local/cargo/bin:$PATH \
+-    RUST_VERSION=%%RUST-VERSION%%
++    RUST_VERSION=%%RUST-VERSION%% \
++    CARGODEB_VERSION=%%CARGODEB-VERSION%%
+ 
+ RUN set -eux; \
+     apt-get update; \
+@@ -22,6 +23,7 @@
      chmod +x rustup-init; \
      ./rustup-init -y --no-modify-path --profile minimal --default-toolchain $RUST_VERSION --default-host ${rustArch}; \
      rm rustup-init; \
-+    cargo install cargo-deb; \
++    cargo install cargo-deb@%%CARGODEB-VERSION%%; \
      chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
      rustup --version; \
      cargo --version; \

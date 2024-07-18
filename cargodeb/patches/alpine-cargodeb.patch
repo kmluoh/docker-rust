@@ -1,10 +1,28 @@
---- a
-+++ b
-@@ -19,6 +19,7 @@ RUN set -eux; \
+--- ../Dockerfile-alpine.template
++++ Dockerfile-alpine.template
+@@ -1,6 +1,6 @@
+ FROM alpine:%%TAG%%
+ 
+-LABEL org.opencontainers.image.source=https://github.com/rust-lang/docker-rust
++LABEL org.opencontainers.image.source=https://github.com/kmluoh/docker-rust
+ 
+ RUN apk add --no-cache \
+         ca-certificates \
+@@ -9,7 +9,8 @@
+ ENV RUSTUP_HOME=/usr/local/rustup \
+     CARGO_HOME=/usr/local/cargo \
+     PATH=/usr/local/cargo/bin:$PATH \
+-    RUST_VERSION=%%RUST-VERSION%%
++    RUST_VERSION=%%RUST-VERSION%% \
++    CARGODEB_VERSION=%%CARGODEB-VERSION%%
+ 
+ RUN set -eux; \
+     %%ARCH-CASE%%; \
+@@ -19,6 +20,7 @@
      chmod +x rustup-init; \
      ./rustup-init -y --no-modify-path --profile minimal --default-toolchain $RUST_VERSION --default-host ${rustArch}; \
      rm rustup-init; \
-+    cargo install cargo-deb; \
++    cargo install cargo-deb@%%CARGODEB-VERSION%%; \
      chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
      rustup --version; \
      cargo --version; \

@@ -9,6 +9,7 @@ import sys
 stable_rust_version = "1.79.0"
 supported_rust_versions = [stable_rust_version, "nightly"]
 rustup_version = "1.27.1"
+cargodeb_version = "2.5.1"
 
 DebianArch = namedtuple("DebianArch", ["bashbrew", "dpkg", "qemu", "rust"])
 
@@ -22,11 +23,43 @@ debian_arches = [
 ]
 
 debian_variants = [
+    "bionic",
     "bullseye",
     "bookworm",
 ]
 
 default_debian_variant = "bookworm"
+
+olddebian_arches = [
+    DebianArch("amd64", "amd64", "linux/amd64", "x86_64-unknown-linux-gnu"),
+    DebianArch("arm32v7", "armhf", "linux/arm/v7", "armv7-unknown-linux-gnueabihf"),
+    DebianArch("arm64v8", "arm64", "linux/arm64", "aarch64-unknown-linux-gnu"),
+    DebianArch("i386", "i386", "linux/386", "i686-unknown-linux-gnu"),
+]
+
+olddebian_variants = [
+    "buster",
+]
+
+ubuntu_arches = [
+    DebianArch("amd64", "amd64", "linux/amd64", "x86_64-unknown-linux-gnu"),
+    DebianArch("arm32v7", "armhf", "linux/arm/v7", "armv7-unknown-linux-gnueabihf"),
+    DebianArch("arm64v8", "arm64", "linux/arm64", "aarch64-unknown-linux-gnu"),
+    DebianArch("ppc64le", "ppc64el", "linux/ppc64le", "powerpc64le-unknown-linux-gnu"),
+    DebianArch("s390x", "s390x", "linux/s390x", "s390x-unknown-linux-gnu"),
+]
+
+ubuntu_variants = [
+    "focal",
+    "jammy",
+]
+
+oldubuntu_arches = debian_arches
+
+oldubuntu_variants = [
+    "trusty",
+    "xenial",
+]
 
 AlpineArch = namedtuple("AlpineArch", ["bashbrew", "apk", "qemu", "rust"])
 
@@ -41,32 +74,6 @@ alpine_versions = [
 ]
 
 default_alpine_version = "3.20"
-
-ubuntu_arches = [
-    DebianArch("amd64", "amd64", "linux/amd64", "x86_64-unknown-linux-gnu"),
-    DebianArch("arm32v7", "armhf", "linux/arm/v7", "armv7-unknown-linux-gnueabihf"),
-    DebianArch("arm64v8", "arm64", "linux/arm64", "aarch64-unknown-linux-gnu"),
-    DebianArch("i386", "i386", "linux/386", "i686-unknown-linux-gnu"),
-]
-
-ubuntu_variants = [
-    "bionic",
-    "buster",
-    "focal",
-    "jammy",
-]
-
-oldubuntu_arches = [
-    DebianArch("amd64", "amd64", "linux/amd64", "x86_64-unknown-linux-gnu"),
-    DebianArch("arm32v7", "armhf", "linux/arm/v7", "armv7-unknown-linux-gnueabihf"),
-    DebianArch("arm64v8", "arm64", "linux/arm64", "aarch64-unknown-linux-gnu"),
-    DebianArch("i386", "i386", "linux/386", "i686-unknown-linux-gnu"),
-]
-
-oldubuntu_variants = [
-    "trusty",
-    "xenial",
-]
 
 def rustup_hash(arch):
     url = f"https://static.rust-lang.org/rustup/archive/{rustup_version}/{arch}/rustup-init.sha256"
@@ -105,6 +112,7 @@ def update_debian():
             rendered = template \
                 .replace("%%RUST-VERSION%%", rust_version) \
                 .replace("%%RUSTUP-VERSION%%", rustup_version) \
+                .replace("%%CARGODEB-VERSION%%", cargodeb_version) \
                 .replace("%%DEBIAN-SUITE%%", variant) \
                 .replace("%%ARCH-CASE%%", case)
             write_file(f"{rust_version}/{variant}/Dockerfile", rendered)
@@ -112,29 +120,44 @@ def update_debian():
             rendered = slim_template \
                 .replace("%%RUST-VERSION%%", rust_version) \
                 .replace("%%RUSTUP-VERSION%%", rustup_version) \
+                .replace("%%CARGODEB-VERSION%%", cargodeb_version) \
                 .replace("%%DEBIAN-SUITE%%", variant) \
                 .replace("%%ARCH-CASE%%", case)
             write_file(f"{rust_version}/{variant}/slim/Dockerfile", rendered)
 
-def update_alpine():
-    arch_case = 'apkArch="$(apk --print-arch)"; \\\n'
-    arch_case += '    case "$apkArch" in \\\n'
-    for arch in alpine_arches:
+def update_olddebian():
+    arch_case = 'dpkgArch="$(dpkg --print-architecture)"; \\\n'
+    arch_case += '    case "${dpkgArch##*-}" in \\\n'
+    for arch in olddebian_arches:
         hash = rustup_hash(arch.rust)
-        arch_case += f"        {arch.apk}) rustArch='{arch.rust}'; rustupSha256='{hash}' ;; \\\n"
-    arch_case += '        *) echo >&2 "unsupported architecture: $apkArch"; exit 1 ;; \\\n'
-    arch_case += '    esac'
+        arch_case += f"        {arch.dpkg}) rustArch='{arch.rust}'; rustupSha256='{hash}' ;; \\\n"
 
-    template = read_file("Dockerfile-alpine.template")
+    end = '        *) echo >&2 "unsupported architecture: ${dpkgArch}"; exit 1 ;; \\\n'
+    end += '    esac'
 
-    for version in alpine_versions:
+    template = read_file("Dockerfile-debian.template")
+    slim_template = read_file("Dockerfile-slim.template")
+
+    for variant in olddebian_variants:
+        case = arch_case
+        case += end
+
         for rust_version in supported_rust_versions:
             rendered = template \
                 .replace("%%RUST-VERSION%%", rust_version) \
                 .replace("%%RUSTUP-VERSION%%", rustup_version) \
-                .replace("%%TAG%%", version) \
-                .replace("%%ARCH-CASE%%", arch_case)
-            write_file(f"{rust_version}/alpine{version}/Dockerfile", rendered)
+                .replace("%%CARGODEB-VERSION%%", cargodeb_version) \
+                .replace("%%DEBIAN-SUITE%%", variant) \
+                .replace("%%ARCH-CASE%%", case)
+            write_file(f"{rust_version}/{variant}/Dockerfile", rendered)
+
+            rendered = slim_template \
+                .replace("%%RUST-VERSION%%", rust_version) \
+                .replace("%%RUSTUP-VERSION%%", rustup_version) \
+                .replace("%%CARGODEB-VERSION%%", cargodeb_version) \
+                .replace("%%DEBIAN-SUITE%%", variant) \
+                .replace("%%ARCH-CASE%%", case)
+            write_file(f"{rust_version}/{variant}/slim/Dockerfile", rendered)
 
 def update_ubuntu():
     arch_case = 'dpkgArch="$(dpkg --print-architecture)"; \\\n'
@@ -156,6 +179,7 @@ def update_ubuntu():
             rendered = template \
                 .replace("%%RUST-VERSION%%", rust_version) \
                 .replace("%%RUSTUP-VERSION%%", rustup_version) \
+                .replace("%%CARGODEB-VERSION%%", cargodeb_version) \
                 .replace("%%DEBIAN-SUITE%%", variant) \
                 .replace("%%ARCH-CASE%%", case)
             write_file(f"{rust_version}/{variant}/Dockerfile", rendered)
@@ -180,9 +204,31 @@ def update_oldubuntu():
             rendered = template \
                 .replace("%%RUST-VERSION%%", rust_version) \
                 .replace("%%RUSTUP-VERSION%%", rustup_version) \
+                .replace("%%CARGODEB-VERSION%%", cargodeb_version) \
                 .replace("%%DEBIAN-SUITE%%", variant) \
                 .replace("%%ARCH-CASE%%", case)
             write_file(f"{rust_version}/{variant}/Dockerfile", rendered)
+
+def update_alpine():
+    arch_case = 'apkArch="$(apk --print-arch)"; \\\n'
+    arch_case += '    case "$apkArch" in \\\n'
+    for arch in alpine_arches:
+        hash = rustup_hash(arch.rust)
+        arch_case += f"        {arch.apk}) rustArch='{arch.rust}'; rustupSha256='{hash}' ;; \\\n"
+    arch_case += '        *) echo >&2 "unsupported architecture: $apkArch"; exit 1 ;; \\\n'
+    arch_case += '    esac'
+
+    template = read_file("Dockerfile-alpine.template")
+
+    for version in alpine_versions:
+        for rust_version in supported_rust_versions:
+            rendered = template \
+                .replace("%%RUST-VERSION%%", rust_version) \
+                .replace("%%RUSTUP-VERSION%%", rustup_version) \
+                .replace("%%CARGODEB-VERSION%%", cargodeb_version) \
+                .replace("%%TAG%%", version) \
+                .replace("%%ARCH-CASE%%", arch_case)
+            write_file(f"{rust_version}/alpine{version}/Dockerfile", rendered)
 
 def update_ci():
     file = ".github/workflows/ci.yml"
@@ -199,9 +245,9 @@ def update_ci():
         versions += f"          - name: slim-{variant}\n"
         versions += f"            variant: {variant}/slim\n"
 
-    for version in alpine_versions:
-        versions += f"          - name: alpine{version}\n"
-        versions += f"            variant: alpine{version}\n"
+    for variant in olddebian_variants:
+        versions += f"          - name: {variant}\n"
+        versions += f"            variant: {variant}\n"
 
     for variant in ubuntu_variants:
         versions += f"          - name: {variant}\n"
@@ -210,6 +256,10 @@ def update_ci():
     for variant in oldubuntu_variants:
         versions += f"          - name: {variant}\n"
         versions += f"            variant: {variant}\n"
+
+    for version in alpine_versions:
+        versions += f"          - name: alpine{version}\n"
+        versions += f"            variant: alpine{version}\n"
 
     marker = "#VERSIONS\n"
     split = rendered.split(marker)
@@ -246,6 +296,51 @@ def update_nightly_ci():
         for tag in tags:
             versions += f"              {tag}-slim\n"
 
+    for variant in olddebian_variants:
+        platforms = []
+        for arch in olddebian_arches:
+            platforms.append(f"{arch.qemu}")
+        platforms = ",".join(platforms)
+
+        tags = [f"nightly-{variant}"]
+
+        versions += f"          - name: {variant}\n"
+        versions += f"            context: nightly/{variant}\n"
+        versions += f"            platforms: {platforms}\n"
+        versions += f"            tags: |\n"
+        for tag in tags:
+            versions += f"              {tag}\n"
+
+    for variant in ubuntu_variants:
+        platforms = []
+        for arch in ubuntu_arches:
+            platforms.append(f"{arch.qemu}")
+        platforms = ",".join(platforms)
+
+        tags = [f"nightly-{variant}"]
+
+        versions += f"          - name: {variant}\n"
+        versions += f"            context: nightly/{variant}\n"
+        versions += f"            platforms: {platforms}\n"
+        versions += f"            tags: |\n"
+        for tag in tags:
+            versions += f"              {tag}\n"
+
+    for variant in oldubuntu_variants:
+        platforms = []
+        for arch in oldubuntu_arches:
+            platforms.append(f"{arch.qemu}")
+        platforms = ",".join(platforms)
+
+        tags = [f"nightly-{variant}"]
+
+        versions += f"          - name: {variant}\n"
+        versions += f"            context: nightly/{variant}\n"
+        versions += f"            platforms: {platforms}\n"
+        versions += f"            tags: |\n"
+        for tag in tags:
+            versions += f"              {tag}\n"
+
     for version in alpine_versions:
         platforms = []
         for arch in alpine_arches:
@@ -263,36 +358,6 @@ def update_nightly_ci():
         for tag in tags:
             versions += f"              {tag}\n"
 
-    for variant in ubuntu_variants:
-        platforms = []
-        for arch in ubuntu_arches:
-            platforms.append(f"{arch.qemu}")
-        platforms = ",".join(platforms)
-
-        tags = [f"nightly-{variant}"]
-
-        versions += f"          - name: {variant}\n"
-        versions += f"            context: nightly/{variant}\n"
-        versions += f"            platforms: {platforms}\n"
-        versions += f"            tags: |\n"
-        for tag in tags:
-            versions += f"              {tag}\n"
-
-    for variant in oldubuntu_variants:
-        platforms = []
-        for arch in oldubuntu_arches:
-            platforms.append(f"{arch.qemu}")
-        platforms = ",".join(platforms)
-
-        tags = [f"nightly-{variant}"]
-
-        versions += f"          - name: {variant}\n"
-        versions += f"            context: nightly/{variant}\n"
-        versions += f"            platforms: {platforms}\n"
-        versions += f"            tags: |\n"
-        for tag in tags:
-            versions += f"              {tag}\n"
-
     marker = "#VERSIONS\n"
     split = config.split(marker)
     rendered = split[0] + marker + versions + marker + split[2]
@@ -300,6 +365,7 @@ def update_nightly_ci():
 
 def update_build_xml():
     file = "build.yml"
+    label = "cargo-deb"
     
     build = subprocess.run(
             ["git", "rev-list", "--count", "HEAD"],
@@ -317,12 +383,25 @@ def update_build_xml():
             platforms.append(f"{arch.qemu}")
         platforms = ",".join(platforms)
 
-        tags = f"{stable_rust_version}-{variant}-{build},{stable_rust_version}-{variant}"
+        tags = f"{label}:{stable_rust_version}-{variant}-{build}"
 
         versions += f"    - name: {variant}\n"
         versions += f"      context: {stable_rust_version}/{variant}\n"
         versions += f"      platforms: {platforms}\n"
         versions += f"      tags: |\n"
+        versions += f"      tags: {tags}\n"
+
+    for variant in olddebian_variants:
+        platforms = []
+        for arch in olddebian_arches:
+            platforms.append(f"{arch.qemu}")
+        platforms = ",".join(platforms)
+
+        tags = f"{label}:{stable_rust_version}-{variant}-{build}"
+
+        versions += f"    - name: {variant}\n"
+        versions += f"      context: {stable_rust_version}/{variant}\n"
+        versions += f"      platforms: {platforms}\n"
         versions += f"      tags: {tags}\n"
 
     for variant in ubuntu_variants:
@@ -331,7 +410,7 @@ def update_build_xml():
             platforms.append(f"{arch.qemu}")
         platforms = ",".join(platforms)
 
-        tags = f"{stable_rust_version}-{variant}-{build},{stable_rust_version}-{variant}"
+        tags = f"{label}:{stable_rust_version}-{variant}-{build}"
 
         versions += f"    - name: {variant}\n"
         versions += f"      context: {stable_rust_version}/{variant}\n"
@@ -344,7 +423,7 @@ def update_build_xml():
             platforms.append(f"{arch.qemu}")
         platforms = ",".join(platforms)
 
-        tags = f"{stable_rust_version}-{variant}-{build},{stable_rust_version}-{variant}"
+        tags = f"{label}:{stable_rust_version}-{variant}-{build}"
 
         versions += f"    - name: {variant}\n"
         versions += f"      context: {stable_rust_version}/{variant}\n"
@@ -447,9 +526,10 @@ if __name__ == "__main__":
     task = sys.argv[1]
     if task == "update":
         update_debian()
-        update_alpine()
+        update_olddebian()
         update_ubuntu()
         update_oldubuntu()
+        update_alpine()
         update_build_xml()
         #update_ci()
         #update_nightly_ci()
