@@ -23,9 +23,10 @@ debian_arches = [
 ]
 
 debian_variants = [
-    "bionic",
     "bullseye",
     "bookworm",
+    "bionic",
+    "xenial",
 ]
 
 default_debian_variant = "bookworm"
@@ -54,11 +55,16 @@ ubuntu_variants = [
     "jammy",
 ]
 
-oldubuntu_arches = debian_arches
+oldubuntu_arches = [
+    DebianArch("amd64", "amd64", "linux/amd64", "x86_64-unknown-linux-gnu"),
+    DebianArch("arm32v7", "armhf", "linux/arm/v7", "armv7-unknown-linux-gnueabihf"),
+    DebianArch("arm64v8", "arm64", "linux/arm64", "aarch64-unknown-linux-gnu"),
+    DebianArch("i386", "i386", "linux/386", "i686-unknown-linux-gnu"),
+    DebianArch("ppc64le", "ppc64el", "linux/ppc64le", "powerpc64le-unknown-linux-gnu"),
+]
 
 oldubuntu_variants = [
     "trusty",
-    "xenial",
 ]
 
 AlpineArch = namedtuple("AlpineArch", ["bashbrew", "apk", "qemu", "rust"])
@@ -194,7 +200,7 @@ def update_oldubuntu():
     end = '        *) echo >&2 "unsupported architecture: ${dpkgArch}"; exit 1 ;; \\\n'
     end += '    esac'
 
-    template = read_file("Dockerfile-oldubuntu.template")
+    template = read_file("Dockerfile-debian.template")
 
     for variant in oldubuntu_variants:
         case = arch_case
@@ -365,7 +371,7 @@ def update_nightly_ci():
 
 def update_build_xml():
     file = "build.yml"
-    label = "cargo-deb"
+    label = "kmluoh/cargo-deb"
     
     build = subprocess.run(
             ["git", "rev-list", "--count", "HEAD"],

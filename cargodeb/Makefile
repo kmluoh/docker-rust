@@ -6,7 +6,6 @@ src:
 	patch ../Dockerfile-debian.template patches/debian-cargodeb.patch -o Dockerfile-debian.template
 	patch ../Dockerfile-alpine.template patches/alpine-cargodeb.patch -o Dockerfile-alpine.template
 	patch ../Dockerfile-slim.template patches/slim-cargodeb.patch -o Dockerfile-slim.template
-	patch Dockerfile-debian.template patches/oldubuntu.patch -o Dockerfile-oldubuntu.template
 	./x.py update
 
 build: src
